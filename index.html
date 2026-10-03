@@ -177,7 +177,9 @@
       <div class="funds-grid" id="fundGrid"></div>
       <div class="sec-t" style="margin-top:18px">场内纳指 ETF</div>
       <div class="asof">在证券账户内二级市场买卖，无基金公司申购限额概念，交易以行情价格为准</div>
+      <div id="etfTopToggle"></div>
       <div class="funds-grid" id="etfGrid"></div>
+      <div id="etfBottomToggle"></div>
       <div class="disc" style="padding-top:12px">状态数据整理自天天基金详情页公开信息（2026-10-03 实测），数据可能滞后，仅供参考，不构成投资建议；具体以基金公司和相应销售渠道当前有效公告为准。任何有限额均如实显示为限购，不按金额归为开放。</div>
     </section>
     <!-- 页 3：休市日历 -->
@@ -558,11 +560,27 @@ function renderFunds() {
       + (f.hist ? '<div class="hist">变更：' + f.hist + '</div>' : '')
       + '</div>').join('');
   }
-  document.getElementById('etfGrid').innerHTML = ETFS.map(e =>
+  document.getElementById('etfGrid').innerHTML = '';
+}
+
+/* ===== 渲染：场内 ETF（默认只展示前 6 只，可展开全部） ===== */
+let etfExpanded = false;
+const ETF_PREVIEW = 6;
+function renderEtf() {
+  const list = etfExpanded ? ETFS : ETFS.slice(0, ETF_PREVIEW);
+  document.getElementById('etfGrid').innerHTML = list.map(e =>
     '<div class="fcard"><div class="t"><div><div class="name">' + e.name + '</div><div class="code">' + e.code + ' · 场内 ETF</div></div>'
     + '<span class="pill ok">可交易</span></div>'
     + '<div class="d">二级市场买卖，无申购限额；申赎门槛以基金公司公告为准</div>'
     + '</div>').join('');
+}
+function renderEtfToggle() {
+  const label = etfExpanded ? '收起，只看前 ' + ETF_PREVIEW + ' 只' : '展开全部 ' + ETFS.length + ' 只场内 ETF';
+  ['etfTopToggle', 'etfBottomToggle'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<span class="chip big">' + label + '</span>';
+    el.querySelector('.chip').addEventListener('click', () => { etfExpanded = !etfExpanded; renderEtfToggle(); renderEtf(); window.scrollTo(0, 0); });
+  });
 }
 
 /* ===== 渲染：首页热门速览（10 只代表性热门） ===== */
@@ -592,6 +610,8 @@ if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
   renderScopeChips();
   renderFundChips();
   renderFunds();
+  renderEtf();
+  renderEtfToggle();
   renderHot();
   document.getElementById('hotMore').addEventListener('click', e => {
     e.preventDefault();
