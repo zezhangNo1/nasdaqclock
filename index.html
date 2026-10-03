@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F3F6">
+<title>美市时钟 · 纳斯达克开闭市时间查询</title>
+<meta name="description" content="纳斯达克开市收市时间查询：开闭市倒计时、休市日历、热门纳指基金申购额度状态。">
+<style>
+  :root{
+    --bg:#F2F3F6; --card:#FFFFFF; --ink:#1C2430; --ink2:#5B6470; --ink3:#9AA2AE;
+    --accent:#D8342F; --line:#E8EAEF;
+    --open:#D8342F; --pre:#E8833A; --closed:#5B6470; --unavail:#9AA2AE;
+    --ok:#1F9D55; --warn:#E8833A; --stop:#C0392B;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+    font-size:15px; line-height:1.5;
+  }
+  #app{max-width:1100px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  header{
+    padding:18px 20px 10px;display:flex;align-items:baseline;justify-content:space-between;
+  }
+  header h1{font-size:20px;font-weight:700;letter-spacing:.5px}
+  header h1 small{font-size:12px;color:var(--ink3);font-weight:400;margin-left:10px}
+  header .dst{font-size:12px;color:var(--ink3)}
+  main{flex:1;padding:0 20px 88px;width:100%}
+  .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
+  .sec-t{font-size:13px;color:var(--ink3);margin:14px 2px 6px;font-weight:500}
+  .page{display:none}
+  .page.on{display:block}
+  /* hero */
+  .hero{text-align:center;padding:26px 16px 20px}
+  .badge{display:inline-block;padding:5px 16px;border-radius:999px;font-size:14px;font-weight:600;color:#fff}
+  .badge.OPEN{background:var(--open)} .badge.PRE_OPEN{background:var(--pre)}
+  .badge.CLOSED{background:var(--closed)} .badge.UNAVAILABLE{background:var(--unavail)}
+  .cd-label{margin-top:14px;font-size:13px;color:var(--ink2)}
+  .cd{font-size:42px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px;margin:2px 0 4px}
+  .cd .unit{font-size:14px;color:var(--ink3);font-weight:400;margin:0 6px 0 2px}
+  .hero-note{font-size:12px;color:var(--ink3)}
+  /* rows */
+  .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--ink2);flex-shrink:0}
+  .row .k small{display:block;font-size:11px;color:var(--ink3);font-weight:400}
+  .row .v{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+  .v.small{font-size:12px;color:var(--ink3)}
+  /* buttons */
+  .btn{border:1px solid var(--accent);color:var(--accent);background:#fff;border-radius:999px;padding:4px 14px;font-size:12px;font-family:inherit;cursor:pointer;flex-shrink:0}
+  .btn.on{background:var(--accent);color:#fff}
+  .chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--ink2);margin:0 6px 6px 0;cursor:pointer;background:#fff;font-variant-numeric:tabular-nums}
+  .chip.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+  .chip.big{font-size:13px;padding:6px 14px;margin:0 8px 6px 0}
+  /* funds */
+  .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 2px 10px}
+  .toolbar input{
+    flex:1;min-width:180px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;
+    font-size:14px;font-family:inherit;background:#fff;color:var(--ink);outline:none;
+  }
+  .toolbar input:focus{border-color:var(--accent)}
+  .funds-grid{display:grid;grid-template-columns:1fr;gap:12px}
+  .fcard{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
+  .fcard .t{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .fcard .name{font-size:14px;font-weight:600}
+  .fcard .code{font-size:12px;color:var(--ink3);margin-top:1px}
+  .pill{flex-shrink:0;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+  .pill.ok{background:#E8F6EE;color:var(--ok)}
+  .pill.warn{background:#FDF1E4;color:var(--warn)}
+  .pill.stop{background:#FBECEA;color:var(--stop)}
+  .fcard .d{font-size:12px;color:var(--ink2);margin-top:6px}
+  .fcard .hist{font-size:12px;color:var(--accent);margin-top:4px}
+  .empty{color:var(--ink3);font-size:13px;padding:16px;text-align:center}
+  /* 首页热门基金速览 */
+  .hot-wrap{padding:0;overflow:hidden}
+  .hot-grid{display:grid;grid-template-columns:1fr}
+  .hot-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line)}
+  .hot-row:last-child{border-bottom:none}
+  .hot-row .nm{flex:1;min-width:0}
+  .hot-row .nm b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hot-row .nm small{font-size:11px;color:var(--ink3)}
+  .hot-row .lm{font-size:12px;color:var(--ink2);text-align:right;max-width:46%}
+  /* calendar */
+  .cal-grid{display:grid;grid-template-columns:1fr;gap:0 28px}
+  .hol{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .hol .date{font-weight:600;font-variant-numeric:tabular-nums;width:92px;flex-shrink:0}
+  .hol .date small{display:block;font-weight:400;color:var(--ink3);font-size:11px}
+  .hol .nm{font-size:14px;flex:1}
+  .hol .tag{font-size:11px;color:var(--pre);flex-shrink:0}
+  .hol .tag.early{color:var(--accent)}
+  .hol .tag.unverified{color:var(--ink3)}
+  .disc{font-size:12px;color:var(--ink3);padding:4px 2px 0;line-height:1.6}
+  .disc a{color:var(--ink3)}
+  .asof{font-size:12px;color:var(--ink3);margin:2px 2px 8px}
+  /* nav：手机底部 tab */
+  nav{
+    position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:1100px;
+    display:flex;background:#fff;border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);z-index:10;
+  }
+  nav button{
+    flex:1;border:none;background:none;padding:9px 0 8px;font-size:11px;color:var(--ink3);
+    display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit;cursor:pointer;
+  }
+  nav button .ico{font-size:20px;line-height:1}
+  nav button.on{color:var(--accent);font-weight:600}
+  /* ===== 桌面端：整页铺开 ===== */
+  @media (min-width: 760px){
+    header{padding:26px 28px 14px}
+    header h1{font-size:26px}
+    main{padding:0 28px 44px}
+    .clock-grid{display:grid;grid-template-columns:5fr 7fr;gap:16px;align-items:stretch}
+    .clock-grid .hero{padding:36px 20px 24px;display:flex;flex-direction:column;justify-content:center;align-items:center}
+    .hero-clocks{margin-top:auto;padding-top:18px;width:100%;border-top:1px solid var(--line);margin-top:22px}
+    .hero-clocks .crow{display:flex;justify-content:space-between;padding:5px 2px;font-size:13px}
+    .hero-clocks .crow .k{color:var(--ink2)}
+    .hero-clocks .crow .v{font-variant-numeric:tabular-nums;font-weight:600}
+    .cd{font-size:56px}
+    .col-stack .sec-t:first-child{margin-top:0}
+    nav{order:-1;position:sticky;top:0;bottom:auto;left:auto;right:auto;transform:none;width:100%;max-width:1100px;border-top:none;border-bottom:2px solid var(--accent);padding-bottom:0;z-index:10;background:#fff;box-shadow:0 2px 8px rgba(28,36,48,.06)}
+    nav button{flex-direction:row;gap:8px;font-size:15px;font-weight:600;color:var(--ink2);padding:15px 30px;flex:0 0 auto;position:relative}
+    nav button.on{color:var(--accent)}
+    nav button.on::after{content:'';position:absolute;left:24px;right:24px;bottom:-2px;height:3px;border-radius:3px 3px 0 0;background:var(--accent)}
+    .funds-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+    .hot-grid{grid-template-columns:1fr 1fr}
+    .hot-grid .hot-row:nth-last-child(-n+2){border-bottom:none}
+    .cal-grid{grid-template-columns:1fr 1fr}
+    .cal-grid .card{align-self:start}
+    .wide-note{grid-column:1 / -1}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>美市时钟<small>纳斯达克开闭市时间查询</small></h1>
+    <span class="dst" id="dstTop"></span>
+  </header>
+  <main>
+    <!-- 页 1：时钟 -->
+    <section class="page on" id="page-clock">
+      <div class="clock-grid">
+        <div class="card hero">
+          <span class="badge" id="badge">—</span>
+          <div class="cd-label" id="cdLabel"></div>
+          <div class="cd" id="cd"></div>
+          <div class="hero-note" id="heroNote"></div>
+          <div class="hero-clocks">
+            <div class="crow"><span class="k">美东时间</span><span class="v" id="clockEt">—</span></div>
+            <div class="crow"><span class="k">北京时间</span><span class="v" id="clockBj">—</span></div>
+          </div>
+        </div>
+        <div class="col-stack">
+          <div class="sec-t">当前 / 下一场</div>
+          <div class="card" id="sessionCard"></div>
+          <div class="sec-t">未来几场开市（北京时间）</div>
+          <div class="card" id="nextCard"></div>
+        </div>
+      </div>
+      <div class="sec-t">热门纳指基金 · 申购限额速览</div>
+      <div class="card hot-wrap">
+        <div class="hot-grid" id="hotGrid"></div>
+      </div>
+      <div class="asof" style="margin:8px 2px 0">数据实测于 2026-10-03 · <a href="#" id="hotMore" style="color:var(--accent);text-decoration:none;font-weight:600">查看全部 87 只（73 场外 + 14 场内 ETF）→</a></div>
+    </section>
+    <!-- 页 2：基金额度（全部） -->
+    <section class="page" id="page-fund">
+      <div id="scopeChips"></div>
+      <div class="sec-t" style="margin-top:12px">纳指/相关 QDII · 申购额度状态（场外）</div>
+      <div class="toolbar">
+        <input id="fundSearch" type="search" placeholder="按基金代码或名称搜索">
+      </div>
+      <div id="fundChips"></div>
+      <div class="asof" id="fundAsof"></div>
+      <div class="funds-grid" id="fundGrid"></div>
+      <div class="sec-t" style="margin-top:18px">场内纳指 ETF</div>
+      <div class="asof">在证券账户内二级市场买卖，无基金公司申购限额概念，交易以行情价格为准</div>
+      <div class="funds-grid" id="etfGrid"></div>
+      <div class="disc" style="padding-top:12px">状态数据整理自天天基金详情页公开信息（2026-10-03 实测），数据可能滞后，仅供参考，不构成投资建议；具体以基金公司和相应销售渠道当前有效公告为准。任何有限额均如实显示为限购，不按金额归为开放。</div>
+    </section>
+    <!-- 页 3：休市日历 -->
+    <section class="page" id="page-cal">
+      <div class="sec-t">节假日休市与提前收市（美东日期）</div>
+      <div class="cal-grid">
+        <div class="card" id="calCard"></div>
+        <div class="disc wide-note" style="padding:12px 4px">日历来源：<a href="https://www.nasdaq.com/market-activity/stock-market-holiday-schedule" target="_blank" rel="noopener">nasdaq.com 官方节假日表</a>，逐条按官方表录入，不做顺延推算。标「待核验」的为按规则预估，须待官方逐年表发布后确认。</div>
+      </div>
+    </section>
+  </main>
+  <nav>
+    <button class="on" data-p="clock"><span class="ico">🕘</span>时钟</button>
+    <button data-p="fund"><span class="ico">📊</span>基金额度</button>
+    <button data-p="cal"><span class="ico">📅</span>休市日历</button>
+  </nav>
+</div>
+
+<script>
+/* ===== 数据：纳斯达克交易日历（与小程序 data/calendar.js 同源 v2026.09.1） ===== */
+const CAL = {
+  calendarVersion: '2026.09.1',
+  verifiedRanges: [
+    { from: '2026-01-01', to: '2026-12-31', verified: true },
+    { from: '2027-01-01', to: '2027-12-31', verified: false }
+  ],
+  holidays: [
+    { usDate: '2026-01-01', name: '元旦' },
+    { usDate: '2026-01-19', name: '马丁·路德·金纪念日' },
+    { usDate: '2026-02-16', name: '华盛顿诞辰日' },
+    { usDate: '2026-04-03', name: '耶稣受难日' },
+    { usDate: '2026-05-25', name: '阵亡将士纪念日' },
+    { usDate: '2026-06-19', name: '六月节' },
+    { usDate: '2026-07-03', name: '独立日（按官方表提前至周五休市）' },
+    { usDate: '2026-09-07', name: '劳动节' },
+    { usDate: '2026-11-26', name: '感恩节' },
+    { usDate: '2026-12-25', name: '圣诞节' },
+    { usDate: '2027-01-01', name: '元旦', unverified: true },
+    { usDate: '2027-01-18', name: '马丁·路德·金纪念日', unverified: true },
+    { usDate: '2027-02-15', name: '华盛顿诞辰日', unverified: true },
+    { usDate: '2027-03-26', name: '耶稣受难日', unverified: true },
+    { usDate: '2027-05-31', name: '阵亡将士纪念日', unverified: true },
+    { usDate: '2027-06-18', name: '六月节（预估提前至周五）', unverified: true },
+    { usDate: '2027-07-05', name: '独立日（预估顺延至周一）', unverified: true },
+    { usDate: '2027-09-06', name: '劳动节', unverified: true },
+    { usDate: '2027-11-25', name: '感恩节', unverified: true },
+    { usDate: '2027-12-24', name: '圣诞节（预估提前至周五）', unverified: true }
+  ],
+  earlyCloses: [
+    { usDate: '2026-07-02', closeEt: '13:00', name: '独立日前夜' },
+    { usDate: '2026-11-27', closeEt: '13:00', name: '感恩节次日' },
+    { usDate: '2026-12-24', closeEt: '13:00', name: '平安夜' },
+    { usDate: '2027-07-01', closeEt: '13:00', name: '独立日前夜', unverified: true },
+    { usDate: '2027-11-26', closeEt: '13:00', name: '感恩节次日', unverified: true },
+    { usDate: '2027-12-23', closeEt: '13:00', name: '平安夜', unverified: true }
+  ]
+};
+CAL.holidayMap = {}; CAL.holidays.forEach(h => CAL.holidayMap[h.usDate] = h);
+CAL.earlyCloseMap = {}; CAL.earlyCloses.forEach(e => CAL.earlyCloseMap[e.usDate] = e);
+CAL.isUsDateVerified = function (usDate) {
+  const r = this.verifiedRanges.find(r => usDate >= r.from && usDate <= r.to);
+  return !!(r && r.verified);
+};
+
+/* ===== 状态机（与小程序 utils/market.js 同源） ===== */
+const pad = n => (n < 10 ? '0' + n : '' + n);
+const MS_H = 3600000;
+function dstRange(year) {
+  const firstSunday = (y, m) => { const d = new Date(Date.UTC(y, m, 1)); return 1 + (7 - d.getUTCDay()) % 7; };
+  return {
+    start: Date.UTC(year, 2, firstSunday(year, 2) + 7, 7),
+    end: Date.UTC(year, 10, firstSunday(year, 10), 6)
+  };
+}
+function isDST(utcMs) {
+  const y = new Date(utcMs).getUTCFullYear();
+  const r = dstRange(y);
+  return utcMs >= r.start && utcMs < r.end;
+}
+function etWallToUtc(y, mo, d, hh, mm) {
+  const cand4 = Date.UTC(y, mo - 1, d, hh, mm) + 4 * MS_H;
+  const cand5 = Date.UTC(y, mo - 1, d, hh, mm) + 5 * MS_H;
+  if (isDST(cand4)) return cand4;
+  if (!isDST(cand5)) return cand5;
+  return cand4;
+}
+function etParts(utcMs) {
+  const off = isDST(utcMs) ? -4 : -5;
+  const d = new Date(utcMs + off * MS_H);
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), hh: d.getUTCHours(), mm: d.getUTCMinutes(), wd: d.getUTCDay() };
+}
+const usDateOf = p => p.y + '-' + pad(p.m) + '-' + pad(p.d);
+function beijingFull(utcMs) {
+  const d = new Date(utcMs + 8 * MS_H);
+  return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) +
+    ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' 周' + '日一二三四五六'[d.getUTCDay()];
+}
+function dstLabel(utcMs) { return isDST(utcMs) ? '夏令时 EDT (UTC−4)' : '冬令时 EST (UTC−5)'; }
+function weekdayEt(usDate) {
+  const [y, m, d] = usDate.split('-').map(Number);
+  return '日一二三四五六'[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+function sessionForDate(us) {
+  const [y, m, d] = us.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  if (dow === 0 || dow === 6) return null;
+  if (CAL.holidayMap[us]) return null;
+  const early = CAL.earlyCloseMap[us];
+  const closeHm = early ? early.closeEt : '16:00';
+  const openMs = etWallToUtc(y, m, d, 9, 30);
+  const closeMs = etWallToUtc(y, m, d, Number(closeHm.split(':')[0]), Number(closeHm.split(':')[1]));
+  if (!(closeMs > openMs)) return null;
+  return { usDate: us, openMs, closeMs, earlyClose: !!early, earlyCloseName: early ? early.name : '' };
+}
+function sessionsFrom(fromUs, days) {
+  const [y, m, d] = fromUs.split('-').map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  const list = [];
+  for (let i = 0; i <= days; i++) {
+    const dt = new Date(base + i * 86400000);
+    const us = dt.getUTCFullYear() + '-' + pad(dt.getUTCMonth() + 1) + '-' + pad(dt.getUTCDate());
+    const s = sessionForDate(us);
+    if (s) list.push(s);
+  }
+  return list;
+}
+function getStatus(nowUtcMs) {
+  const todayUs = usDateOf(etParts(nowUtcMs));
+  const sessions = sessionsFrom(todayUs, 21);
+  if (!CAL.isUsDateVerified(todayUs)) {
+    return { phase: 'UNAVAILABLE', message: '所在日期区间日历尚未核验，暂无法确认开市时间。', current: null, next: null, target: null, upcoming: [] };
+  }
+  const openNow = sessions.find(s => s.openMs <= nowUtcMs && nowUtcMs < s.closeMs);
+  if (openNow) {
+    return {
+      phase: 'OPEN', current: openNow,
+      next: sessions.find(s => s.openMs > nowUtcMs) || null,
+      target: { kind: 'CLOSE', atMs: openNow.closeMs },
+      upcoming: sessions.filter(s => s.openMs > nowUtcMs).slice(0, 3)
+    };
+  }
+  const todaySession = sessions.find(s => s.usDate === todayUs);
+  if (todaySession && nowUtcMs < todaySession.openMs) {
+    return { phase: 'PRE_OPEN', current: null, next: todaySession, target: { kind: 'OPEN', atMs: todaySession.openMs }, upcoming: sessions.filter(s => s.openMs > nowUtcMs).slice(0, 3) };
+  }
+  const next = sessions.find(s => s.openMs > nowUtcMs);
+  if (!next) {
+    return { phase: 'UNAVAILABLE', message: '日历覆盖范围内找不到下一场会话，需更新日历。', current: null, next: null, target: null, upcoming: [] };
+  }
+  let reason = '未知休市';
+  const dow = new Date(todayUs + 'T00:00:00Z').getUTCDay();
+  if (dow === 0 || dow === 6) reason = '周末休市';
+  else if (CAL.holidayMap[todayUs]) reason = '节假日：' + CAL.holidayMap[todayUs].name;
+  else if (todaySession && nowUtcMs >= todaySession.closeMs) reason = '今日已收盘';
+  return { phase: 'CLOSED', reason, current: null, next, target: { kind: 'OPEN', atMs: next.openMs }, upcoming: sessions.filter(s => s.openMs > nowUtcMs).slice(0, 3) };
+}
+
+/* ===== 数据：纳指/相关 QDII（全量名单 + 实测状态） =====
+   hot:true = 重点名单（首页速览与基金页默认展示）；其余为全市场登记，默认收起，可一键展开 */
+const FUNDS_ALL = [
+  { code: "013127", name: "汇添富恒生科技ETF联接发起式(QDII)A", cls: "A类", st: "ok", text: "开放申购", limit: "开放申购（代销口径）", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "013128", name: "汇添富恒生科技ETF联接发起式(QDII)C", cls: "C类", st: "ok", text: "开放申购", limit: "开放申购（代销口径）", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "000834", name: "大成纳斯达克100ETF联接(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "006555", name: "浦银全球智能科技(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计上限 1000 元（代销口径，A/C 分别计算）", src: "天天基金详情页实测", at: "2026-10-03", hist: "09-21 起：开放不限额 → 限购 1000 元/日（收紧）", hot: true },
+  { code: "008971", name: "大成纳斯达克100ETF联接(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "012751", name: "建信纳斯达克100指数(QDII)A美元现汇", cls: "美元现汇", st: "warn", text: "限购", limit: "限购（限额口径以公告为准）", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "012752", name: "建信纳斯达克100指数(QDII)C人民币", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "012753", name: "建信纳斯达克100指数(QDII)C美元现汇", cls: "美元现汇", st: "warn", text: "限购", limit: "限购（限额口径以公告为准）", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "014978", name: "华安纳斯达克100ETF联接(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 5 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016452", name: "南方纳斯达克100指数发起(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016453", name: "南方纳斯达克100指数发起(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017436", name: "华宝纳斯达克精选股票发起式(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 2000 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017437", name: "华宝纳斯达克精选股票发起式(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 2000 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017894", name: "汇添富纳斯达克生物科技ETF发起式联接(QDII)人民币A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017895", name: "汇添富纳斯达克生物科技ETF发起式联接(QDII)人民币C", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019172", name: "摩根纳斯达克100指数(QDII)人民币A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019173", name: "摩根纳斯达克100指数(QDII)人民币C", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019174", name: "摩根纳斯达克100指数(QDII)美元现汇A", cls: "美元现汇", st: "warn", text: "限购", limit: "限购（限额口径以公告为准）", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019175", name: "摩根纳斯达克100指数(QDII)美元现汇C", cls: "美元现汇", st: "warn", text: "限购", limit: "限购（限额口径以公告为准）", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019441", name: "万家纳斯达克100指数发起式(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "019442", name: "万家纳斯达克100指数发起式(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "019524", name: "华泰柏瑞纳斯达克100ETF发起式联接(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 5 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019525", name: "华泰柏瑞纳斯达克100ETF发起式联接(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 5 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019547", name: "招商纳斯达克100ETF发起式联接(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019548", name: "招商纳斯达克100ETF发起式联接(QDII)C", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019736", name: "宝盈纳斯达克100指数发起(QDII)A人民币", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019737", name: "宝盈纳斯达克100指数发起(QDII)C人民币", cls: "C类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "021000", name: "南方纳斯达克100指数发起(QDII)I", cls: "A类", st: "warn", text: "限购", limit: "限购（限额口径以公告为准）", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "022664", name: "华泰柏瑞纳斯达克100ETF发起式联接(QDII)I", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 5 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "023422", name: "建信纳斯达克100指数(QDII)D人民币", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "040046", name: "华安纳斯达克100ETF联接(QDII)A", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 5 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "539001", name: "建信纳斯达克100指数(QDII)A人民币", cls: "A类", st: "warn", text: "限购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "000055", name: "广发纳斯达克100ETF联接美元(QDII)A", cls: "A类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "003722", name: "易方达纳斯达克100ETF联接(QDII-LOF)A(美元现汇)", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "006479", name: "广发纳斯达克100ETF联接人民币(QDII)C", cls: "C类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 2 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "006480", name: "广发纳斯达克100ETF联接美元(QDII)C", cls: "C类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "012870", name: "易方达纳斯达克100ETF联接(QDII-LOF)C(人民币)", cls: "LOF", st: "stop", text: "暂停申购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "012871", name: "易方达纳斯达克100ETF联接(QDII-LOF)C(美元现汇)", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "015299", name: "华夏纳斯达克100ETF发起式联接(QDII)A", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "015300", name: "华夏纳斯达克100ETF发起式联接(QDII)C", cls: "C类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "015518", name: "华夏纳斯达克100ETF发起式联接(QDII)A美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016055", name: "博时纳斯达克100ETF发起式联接(QDII)A人民币", cls: "A类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016056", name: "博时纳斯达克100ETF发起式联接(QDII)A美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016057", name: "博时纳斯达克100ETF发起式联接(QDII)C人民币", cls: "C类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016058", name: "博时纳斯达克100ETF发起式联接(QDII)C美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016532", name: "嘉实纳斯达克100ETF发起联接(QDII)A人民币", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016533", name: "嘉实纳斯达克100ETF发起联接(QDII)C人民币", cls: "C类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016534", name: "嘉实纳斯达克100ETF发起联接(QDII)A美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "016535", name: "嘉实纳斯达克100ETF发起联接(QDII)C美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017091", name: "景顺长城纳斯达克科技ETF联接(QDII)A人民币", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017092", name: "景顺长城纳斯达克科技ETF联接(QDII)A美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017093", name: "景顺长城纳斯达克科技ETF联接(QDII)C人民币", cls: "C类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "017951", name: "汇添富纳斯达克生物科技ETF发起式联接(QDII)美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "017952", name: "汇添富纳斯达克生物科技ETF发起式联接(QDII)美元现钞", cls: "美元现钞", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "018043", name: "天弘纳斯达克100指数发起(QDII)A", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "018044", name: "天弘纳斯达克100指数发起(QDII)C", cls: "C类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "018966", name: "汇添富纳斯达克100ETF发起式联接(QDII)人民币A", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "018967", name: "汇添富纳斯达克100ETF发起式联接(QDII)人民币C", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "018968", name: "汇添富纳斯达克100ETF发起式联接(QDII)美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "018969", name: "汇添富纳斯达克100ETF发起式联接(QDII)美元现钞", cls: "美元现钞", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019118", name: "景顺长城纳斯达克科技ETF联接(QDII)E人民币", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "021773", name: "汇添富纳斯达克100ETF发起式联接(QDII)人民币E", cls: "E类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "021778", name: "广发纳指100ETF联接(QDII)人民币F", cls: "A类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "021838", name: "嘉实纳斯达克100ETF发起联接(QDII)I人民币", cls: "A类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "024237", name: "博时纳斯达克100ETF发起式联接(QDII)I人民币", cls: "A类", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "040047", name: "华安纳斯达克100ETF联接(QDII)A美元现钞", cls: "美元现钞", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "040048", name: "华安纳斯达克100ETF联接(QDII)A美元现汇", cls: "美元现汇", st: "stop", text: "暂停申购", limit: "暂停申购", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "160213", name: "国泰纳斯达克100指数", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 100 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "161130", name: "易方达纳斯达克100ETF联接(QDII-LOF)A(人民币)", cls: "LOF", st: "stop", text: "暂停申购", limit: "单日累计购买上限 10 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "270042", name: "广发纳斯达克100ETF联接人民币(QDII)A", cls: "A类", st: "stop", text: "暂停申购", limit: "单日累计购买上限 2 元", src: "天天基金详情页实测", at: "2026-10-03", hot: true },
+  { code: "019738", name: "宝盈纳斯达克100指数发起(QDII)A美元现汇", cls: "美元现汇", st: "unk", text: "以公告为准", limit: "详情页未展示申购状态区块，状态以基金公司公告为准", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "019739", name: "宝盈纳斯达克100指数发起(QDII)C美元现汇", cls: "美元现汇", st: "unk", text: "以公告为准", limit: "详情页未展示申购状态区块，状态以基金公司公告为准", src: "天天基金详情页实测", at: "2026-10-03" },
+  { code: "022525", name: "天弘纳斯达克100指数发起(QDII)D", cls: "D类", st: "unk", text: "以公告为准", limit: "详情页未展示申购状态区块，状态以基金公司公告为准", src: "天天基金详情页实测", at: "2026-10-03" }
+];
+/* 重点名单：原实测登记池（基金页默认展示 + 首页速览候选） */
+const HOT14 = new Set(['013127','013128','006555','000834','040046','019441','019442','160213','270042','006479','040047','161130','018043','018044','017093']);
+FUNDS_ALL.forEach(f => { f.hot = HOT14.has(f.code); });
+/* 场内纳指 ETF：二级市场买卖，无申购限额概念（2026-10-03 名称核验） */
+const ETFS = [
+  { code: "159501", name: "纳指ETF嘉实" },
+  { code: "159509", name: "纳指科技ETF景顺" },
+  { code: "159513", name: "纳斯达克100ETF大成" },
+  { code: "159632", name: "纳斯达克ETF华安" },
+  { code: "159659", name: "纳斯达克100ETF招商" },
+  { code: "159660", name: "纳指ETF汇添富" },
+  { code: "159696", name: "纳指ETF易方达" },
+  { code: "159941", name: "纳指ETF广发" },
+  { code: "513100", name: "纳指ETF国泰" },
+  { code: "513110", name: "纳指ETF华泰柏瑞" },
+  { code: "513290", name: "纳指生物科技ETF汇添富" },
+  { code: "513300", name: "纳斯达克ETF华夏" },
+  { code: "513390", name: "纳指100ETF博时" },
+  { code: "513870", name: "纳指ETF富国" }
+];
+const FUND_ASOF = '数据实测于 2026-10-03（天天基金详情页）· 场外 73 只 + 场内 ETF 14 只 · 默认展示重点名单，点「展开全部基金」查看全量 · 任何有限额均如实显示为限购';
+
+/* ===== 渲染：时钟 ===== */
+function fmtCountdown(msLeft) {
+  if (msLeft < 0) msLeft = 0;
+  const s = Math.floor(msLeft / 1000);
+  return { h: Math.floor(s / 3600), m: Math.floor(s % 3600 / 60), s: s % 60 };
+}
+function sessionRows(s, title) {
+  return ''
+    + '<div class="row"><span class="k">' + title + '</span><span class="v">' + s.usDate + ' 周' + weekdayEt(s.usDate) + (s.earlyClose ? ' · 提前收市' : '') + '</span></div>'
+    + '<div class="row"><span class="k">开市（北京时间）</span><span class="v">' + beijingFull(s.openMs) + '</span></div>'
+    + '<div class="row"><span class="k">收市（北京时间）</span><span class="v">' + beijingFull(s.closeMs) + '</span></div>'
+    + '<div class="row"><span class="k">时令</span><span class="v small">' + dstLabel(s.openMs) + '</span></div>';
+}
+let lastStatus = null;
+function renderClock() {
+  const now = Date.now();
+  const st = getStatus(now);
+  const phaseChanged = !lastStatus || lastStatus.phase !== st.phase || (lastStatus.target && st.target && lastStatus.target.atMs !== st.target.atMs);
+  lastStatus = st;
+
+  const badge = document.getElementById('badge');
+  const cd = document.getElementById('cd');
+  document.getElementById('dstTop').textContent = dstLabel(now);
+
+  const phaseText = { OPEN: '开市中', PRE_OPEN: '盘前', CLOSED: '休市', UNAVAILABLE: '暂不可用' }[st.phase];
+  badge.textContent = phaseText;
+  badge.className = 'badge ' + st.phase;
+
+  if (st.phase === 'UNAVAILABLE') {
+    document.getElementById('cdLabel').textContent = '';
+    cd.innerHTML = '--<span class="unit">时</span>--<span class="unit">分</span>';
+    document.getElementById('heroNote').textContent = st.message || '';
+    return;
+  }
+
+  const msLeft = st.target.atMs - now;
+  const c = fmtCountdown(msLeft);
+  document.getElementById('cdLabel').textContent = st.target.kind === 'CLOSE' ? '距本场收盘' : '距下一场开盘';
+  cd.innerHTML = c.h + '<span class="unit">时</span>' + c.m + '<span class="unit">分</span>' + pad(c.s) + '<span class="unit">秒</span>';
+  document.getElementById('heroNote').textContent = st.phase === 'CLOSED' && st.reason ? st.reason : '';
+
+  const hms = off => { const d = new Date(now + off * MS_H); return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()); };
+  const dayCn = off => { const d = new Date(now + off * MS_H); return '周' + '日一二三四五六'[d.getUTCDay()]; };
+  document.getElementById('clockEt').textContent = hms(isDST(now) ? -4 : -5) + ' ' + dayCn(isDST(now) ? -4 : -5);
+  document.getElementById('clockBj').textContent = hms(8) + ' ' + dayCn(8);
+
+  if (phaseChanged) {
+    let html = '';
+    if (st.current) html += sessionRows(st.current, '本场（美东）');
+    if (st.next) html += sessionRows(st.next, '下一场（美东）');
+    document.getElementById('sessionCard').innerHTML = html;
+
+    let up = '';
+    st.upcoming.forEach(s => {
+      up += '<div class="row"><span class="k">' + s.usDate + ' 周' + weekdayEt(s.usDate) + (s.earlyClose ? ' · 提前收市' : '') + '</span>'
+         + '<span class="v">' + beijingFull(s.openMs).slice(11) + ' 开市</span></div>';
+    });
+    document.getElementById('nextCard').innerHTML = up || '<div class="row"><span class="k">—</span></div>';
+    document.getElementById('nextCard').insertAdjacentHTML('beforeend',
+      '<div class="row"><span class="k">日历版本</span><span class="v small">' + CAL.calendarVersion + ' · nasdaq.com 官方表</span></div>');
+  }
+}
+
+/* ===== 渲染：日历 ===== */
+function renderCalendar() {
+  const todayUs = usDateOf(etParts(Date.now()));
+  const items = [];
+  CAL.holidays.forEach(h => { if (h.usDate >= todayUs) items.push({ d: h.usDate, nm: h.name, tag: h.unverified ? '待核验' : '全日休市', cls: h.unverified ? 'unverified' : '' }); });
+  CAL.earlyCloses.forEach(e => { if (e.usDate >= todayUs) items.push({ d: e.usDate, nm: e.name + ' · 收市 ' + e.closeEt + '（美东）', tag: e.unverified ? '待核验' : '提前收市', cls: e.unverified ? 'unverified' : 'early' }); });
+  items.sort((a, b) => a.d.localeCompare(b.d));
+  let html = '';
+  items.forEach(it => {
+    html += '<div class="hol"><div class="date">' + it.d.slice(5).replace('-', ' / ') + '<small>' + it.d.slice(0, 4) + ' 周' + weekdayEt(it.d) + '</small></div>'
+         + '<div class="nm">' + it.nm + '</div><div class="tag ' + it.cls + '">' + it.tag + '</div></div>';
+  });
+  document.getElementById('calCard').innerHTML = html || '<div class="empty">覆盖范围内暂无</div>';
+}
+
+/* ===== 渲染：基金（重点/全部切换 + 搜索 + 状态筛选） ===== */
+let fundScope = 'hot';
+let fundFilter = 'all';
+let fundKeyword = '';
+const FUND_CHIPS = [
+  { v: 'all', label: '全部' },
+  { v: 'ok', label: '开放申购' },
+  { v: 'warn', label: '限购' },
+  { v: 'stop', label: '暂停申购' }
+];
+const HOT_SET = new Set(FUNDS_ALL.filter(f => f.hot).map(f => f.code));
+function renderScopeChips() {
+  const hotN = FUNDS_ALL.filter(f => f.hot).length;
+  document.getElementById('scopeChips').innerHTML =
+    '<span class="chip big' + (fundScope === 'hot' ? ' on' : '') + '" data-s="hot">重点名单（' + hotN + ' 只场外 + ' + ETFS.length + ' 只 ETF）</span>'
+    + '<span class="chip big' + (fundScope === 'all' ? ' on' : '') + '" data-s="all">展开全部基金（' + FUNDS_ALL.length + ' 只）</span>';
+  document.querySelectorAll('#scopeChips .chip').forEach(el => {
+    el.addEventListener('click', () => { fundScope = el.dataset.s; renderScopeChips(); renderFunds(); });
+  });
+}
+function renderFundChips() {
+  document.getElementById('fundChips').innerHTML = FUND_CHIPS.map(c =>
+    '<span class="chip' + (fundFilter === c.v ? ' on' : '') + '" data-v="' + c.v + '">' + c.label + '</span>').join('');
+  document.querySelectorAll('#fundChips .chip').forEach(el => {
+    el.addEventListener('click', () => { fundFilter = el.dataset.v; renderFundChips(); renderFunds(); });
+  });
+}
+function renderFunds() {
+  const pool = fundScope === 'all' ? FUNDS_ALL : FUNDS_ALL.filter(f => f.hot);
+  const list = pool.filter(f =>
+    (fundFilter === 'all' || f.st === fundFilter) &&
+    (!fundKeyword || f.name.toLowerCase().includes(fundKeyword) || f.code.includes(fundKeyword)));
+  const cnt = { ok: 0, warn: 0, stop: 0 };
+  FUNDS_ALL.forEach(f => { if (cnt[f.st] !== undefined) cnt[f.st]++; });
+  document.getElementById('fundAsof').textContent = FUND_ASOF + ' · 场外共 ' + FUNDS_ALL.length + ' 只（开放 ' + cnt.ok + ' / 限购 ' + cnt.warn + ' / 暂停 ' + cnt.stop + '）· 当前显示 ' + list.length + ' 只';
+  if (!list.length) {
+    document.getElementById('fundGrid').innerHTML = '<div class="empty">没有匹配的基金</div>';
+  } else {
+    document.getElementById('fundGrid').innerHTML = list.map(f =>
+      '<div class="fcard"><div class="t"><div><div class="name">' + f.name + '</div><div class="code">' + f.code + ' · ' + f.cls + '</div></div>'
+      + '<span class="pill ' + f.st + '">' + f.text + '</span></div>'
+      + '<div class="d">' + f.limit + '</div>'
+      + '<div class="d">来源：' + f.src + ' · ' + f.at + '</div>'
+      + (f.hist ? '<div class="hist">变更：' + f.hist + '</div>' : '')
+      + '</div>').join('');
+  }
+  document.getElementById('etfGrid').innerHTML = ETFS.map(e =>
+    '<div class="fcard"><div class="t"><div><div class="name">' + e.name + '</div><div class="code">' + e.code + ' · 场内 ETF</div></div>'
+    + '<span class="pill ok">可交易</span></div>'
+    + '<div class="d">二级市场买卖，无申购限额；申赎门槛以基金公司公告为准</div>'
+    + '</div>').join('');
+}
+
+/* ===== 渲染：首页热门速览（10 只代表性热门） ===== */
+const HOT_CODES = ['006555', '000834', '019441', '040046', '160213', '270042', '006479', '018043', '161130', '017093'];
+function renderHot() {
+  const list = HOT_CODES.map(c => FUNDS_ALL.find(f => f.code === c)).filter(Boolean);
+  document.getElementById('hotGrid').innerHTML = list.map(f =>
+    '<div class="hot-row"><div class="nm"><b>' + f.name + '</b><small>' + f.code + ' · ' + f.cls + '</small></div>'
+    + '<span class="pill ' + f.st + '">' + f.text + '</span>'
+    + '<div class="lm">' + f.limit + '</div></div>').join('');
+}
+
+/* 页签 */
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+    document.getElementById('page-' + btn.dataset.p).classList.add('on');
+    window.scrollTo(0, 0);
+  });
+});
+
+if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
+  renderClock();
+  renderCalendar();
+  renderScopeChips();
+  renderFundChips();
+  renderFunds();
+  renderHot();
+  document.getElementById('hotMore').addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector('nav button[data-p="fund"]').click();
+  });
+  document.getElementById('fundSearch').addEventListener('input', e => {
+    fundKeyword = e.target.value.trim().toLowerCase();
+    renderFunds();
+  });
+  setInterval(renderClock, 1000);
+}
+</script>
+</body>
+</html>
