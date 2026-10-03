@@ -111,11 +111,8 @@
     header{padding:26px 28px 14px}
     header h1{font-size:26px}
     main{padding:0 28px 44px}
-    .clock-grid{display:grid;grid-template-columns:5fr 7fr;gap:0;align-items:stretch;background:var(--card);border-radius:16px;box-shadow:0 1px 2px rgba(28,36,48,.04);overflow:hidden}
-    .clock-grid .hero{background:none;box-shadow:none;border-radius:0;border-right:1px solid var(--line);padding:36px 20px 24px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-    .clock-grid .col-stack{padding:2px 20px 6px}
-    .clock-grid .col-stack .card{background:none;box-shadow:none;border-radius:0;padding:2px 0 6px}
-    .clock-grid .sec-div{border-top:1px solid var(--line);margin-top:10px;padding-top:12px}
+    .clock-grid{display:grid;grid-template-columns:5fr 7fr;gap:2px;align-items:stretch}
+    .clock-grid .hero{padding:36px 20px 24px;display:flex;flex-direction:column;justify-content:center;align-items:center}
     .hero-clocks{margin-top:auto;padding-top:18px;width:100%;border-top:1px solid var(--line);margin-top:22px}
     .hero-clocks .crow{display:flex;justify-content:space-between;padding:5px 2px;font-size:13px}
     .hero-clocks .crow .k{color:var(--ink2)}
@@ -128,7 +125,13 @@
     nav button.on::after{content:'';position:absolute;left:24px;right:24px;bottom:-2px;height:3px;border-radius:3px 3px 0 0;background:var(--accent)}
     .funds-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
     .hot-grid{grid-template-columns:1fr 1fr}
-    .hot-grid .hot-row:nth-child(even){border-left:1px solid var(--line)}
+    .hot-wrap{background:none;box-shadow:none}
+    .hot-grid{gap:0 2px}
+    .hot-row{background:var(--card)}
+    .hot-row:first-child{border-top-left-radius:16px}
+    .hot-row:nth-child(2){border-top-right-radius:16px}
+    .hot-row:nth-last-child(2){border-bottom-left-radius:16px}
+    .hot-row:last-child{border-bottom-right-radius:16px}
     .hot-grid .hot-row:nth-last-child(-n+2){border-bottom:none}
     .cal-grid{grid-template-columns:1fr 1fr}
     .cal-grid .card{align-self:start}
@@ -159,7 +162,7 @@
         <div class="col-stack">
           <div class="sec-t">当前 / 下一场</div>
           <div class="card" id="sessionCard"></div>
-          <div class="sec-t sec-div">未来几场开市（北京时间）</div>
+          <div class="sec-t">未来几场开市（北京时间）</div>
           <div class="card" id="nextCard"></div>
         </div>
       </div>
