@@ -167,14 +167,15 @@
     </section>
     <!-- 页 2：基金额度（全部） -->
     <section class="page" id="page-fund">
-      <div id="scopeChips"></div>
-      <div class="sec-t" style="margin-top:12px">纳指/相关 QDII · 申购额度状态（场外）</div>
+      <div class="sec-t">纳指/相关 QDII · 申购额度状态（场外）</div>
       <div class="toolbar">
         <input id="fundSearch" type="search" placeholder="按基金代码或名称搜索">
       </div>
       <div id="fundChips"></div>
       <div class="asof" id="fundAsof"></div>
+      <div id="fundTopToggle"></div>
       <div class="funds-grid" id="fundGrid"></div>
+      <div id="fundBottomToggle"></div>
       <div class="sec-t" style="margin-top:18px">场内纳指 ETF</div>
       <div class="asof">在证券账户内二级市场买卖，无基金公司申购限额概念，交易以行情价格为准</div>
       <div id="etfTopToggle"></div>
@@ -434,7 +435,7 @@ const ETFS = [
   { code: "513390", name: "纳指100ETF博时" },
   { code: "513870", name: "纳指ETF富国" }
 ];
-const FUND_ASOF = '重点名单 = 最新披露规模 Top 15（定期报告，季频）· 状态实测于 2026-10-03（天天基金详情页）· 场外 73 只 + 场内 ETF 14 只 · 默认展示重点名单，点「展开全部基金」查看全量 · 任何有限额均如实显示为限购';
+const FUND_ASOF = '重点名单 = 最新披露规模 Top 15（定期报告，季频）· 状态实测于 2026-10-03（天天基金详情页）· 场外 73 只 + 场内 ETF 14 只 · 默认展示重点名单，点「展开全部场外基金」查看全量 · 任何有限额均如实显示为限购';
 /* 规模数据：基金定期报告披露的期末净资产（亿元），季频更新；同基金各份额（A/C/美元）共享同一规模值 */
 const SCALE_DATA = {"159501":{"sc":124.11,"at":"2026-06-30"},"159509":{"sc":151.28,"at":"2026-06-30"},"159513":{"sc":73.84,"at":"2026-06-30"},"159632":{"sc":113,"at":"2026-06-30"},"159659":{"sc":99.36,"at":"2026-06-30"},"159660":{"sc":49.1,"at":"2026-06-30"},"159696":{"sc":50.11,"at":"2026-06-30"},"159941":{"sc":346.82,"at":"2026-06-30"},"160213":{"sc":21.77,"at":"2026-06-30"},"161130":{"sc":17.83,"at":"2026-06-30"},"270042":{"sc":122.23,"at":"2026-06-30"},"513100":{"sc":194.68,"at":"2026-06-30"},"513110":{"sc":50.98,"at":"2026-06-30"},"513290":{"sc":15.28,"at":"2026-06-30"},"513300":{"sc":132.88,"at":"2026-06-30"},"513390":{"sc":42.5,"at":"2026-06-30"},"513870":{"sc":24.71,"at":"2026-06-30"},"539001":{"sc":21.76,"at":"2026-06-30"},"013127":{"sc":11.25,"at":"2026-06-30"},"013128":{"sc":18.65,"at":"2026-06-30"},"000834":{"sc":48.87,"at":"2026-06-30"},"006555":{"sc":18.5,"at":"2026-06-30"},"008971":{"sc":11.1,"at":"2026-06-30"},"012751":{"sc":21.76,"at":"2026-06-30"},"012752":{"sc":12.88,"at":"2026-06-30"},"012753":{"sc":12.88,"at":"2026-06-30"},"014978":{"sc":13.48,"at":"2026-06-30"},"016452":{"sc":62.1,"at":"2026-06-30"},"016453":{"sc":48.33,"at":"2026-06-30"},"017436":{"sc":47.06,"at":"2026-06-30"},"017437":{"sc":56.2,"at":"2026-06-30"},"017894":{"sc":2.89,"at":"2026-06-30"},"017895":{"sc":2.24,"at":"2026-06-30"},"019172":{"sc":29.69,"at":"2026-06-30"},"019173":{"sc":10.8,"at":"2026-06-30"},"019174":{"sc":0.15,"at":"2026-06-30"},"019175":{"sc":0.14,"at":"2026-06-30"},"019441":{"sc":9.68,"at":"2026-06-30"},"019442":{"sc":4.29,"at":"2026-06-30"},"019524":{"sc":8.16,"at":"2026-06-30"},"019525":{"sc":6.39,"at":"2026-06-30"},"019547":{"sc":21.78,"at":"2026-06-30"},"019548":{"sc":15.17,"at":"2026-06-30"},"019736":{"sc":10.63,"at":"2026-06-30"},"019737":{"sc":4.06,"at":"2026-06-30"},"021000":{"sc":31.36,"at":"2026-06-30"},"022664":{"sc":0.6,"at":"2026-06-30"},"023422":{"sc":0.52,"at":"2026-06-30"},"040046":{"sc":58.1,"at":"2026-06-30"},"000055":{"sc":122.23,"at":"2026-06-30"},"003722":{"sc":17.83,"at":"2026-06-30"},"006479":{"sc":64.93,"at":"2026-06-30"},"006480":{"sc":64.93,"at":"2026-06-30"},"012870":{"sc":1.8,"at":"2026-06-30"},"012871":{"sc":1.8,"at":"2026-06-30"},"015299":{"sc":3.23,"at":"2026-06-30"},"015300":{"sc":1.68,"at":"2026-06-30"},"015518":{"sc":3.23,"at":"2026-06-30"},"016055":{"sc":15.04,"at":"2026-06-30"},"016056":{"sc":15.04,"at":"2026-06-30"},"016057":{"sc":7.07,"at":"2026-06-30"},"016058":{"sc":7.07,"at":"2026-06-30"},"016532":{"sc":20.77,"at":"2026-06-30"},"016533":{"sc":16.4,"at":"2026-06-30"},"016534":{"sc":20.77,"at":"2026-06-30"},"016535":{"sc":16.4,"at":"2026-06-30"},"017091":{"sc":27.7,"at":"2026-06-30"},"017092":{"sc":27.7,"at":"2026-06-30"},"017093":{"sc":13.28,"at":"2026-06-30"},"017951":{"sc":0.11,"at":"2026-06-30"},"017952":{"sc":0,"at":"2023-06-30"},"018043":{"sc":30.75,"at":"2026-06-30"},"018044":{"sc":29.34,"at":"2026-06-30"},"018966":{"sc":16.33,"at":"2026-06-30"},"018967":{"sc":11.09,"at":"2026-06-30"},"018968":{"sc":0.23,"at":"2026-06-30"},"018969":{"sc":0,"at":"2023-12-31"},"019118":{"sc":8.88,"at":"2026-06-30"},"021773":{"sc":3.64,"at":"2026-06-30"},"021778":{"sc":21.47,"at":"2026-06-30"},"021838":{"sc":0.24,"at":"2026-06-30"},"024237":{"sc":1.7,"at":"2026-06-30"},"040047":{"sc":58.1,"at":"2026-06-30"},"040048":{"sc":58.1,"at":"2026-06-30"},"019738":{"sc":10.63,"at":"2026-06-30"},"019739":{"sc":4.06,"at":"2026-06-30"},"022525":{"sc":1.71,"at":"2026-06-30"}};
 FUNDS_ALL.forEach(f => { const s = SCALE_DATA[f.code]; f.sc = s ? s.sc : null; f.scAt = s ? s.at : null; f.hot = false; });
@@ -540,13 +541,18 @@ const FUND_CHIPS = [
   { v: 'stop', label: '暂停申购' }
 ];
 const HOT_SET = new Set(FUNDS_ALL.filter(f => f.hot).map(f => f.code));
-function renderScopeChips() {
+function renderFundToggle() {
   const hotN = FUNDS_ALL.filter(f => f.hot).length;
-  document.getElementById('scopeChips').innerHTML =
-    '<span class="chip big' + (fundScope === 'hot' ? ' on' : '') + '" data-s="hot">重点名单（' + hotN + ' 只场外 + ' + ETFS.length + ' 只 ETF）</span>'
-    + '<span class="chip big' + (fundScope === 'all' ? ' on' : '') + '" data-s="all">展开全部基金（' + FUNDS_ALL.length + ' 只）</span>';
-  document.querySelectorAll('#scopeChips .chip').forEach(el => {
-    el.addEventListener('click', () => { fundScope = el.dataset.s; renderScopeChips(); renderFunds(); });
+  const label = fundScope === 'all'
+    ? '收起，只看重点名单 ' + hotN + ' 只'
+    : '展开全部 ' + FUNDS_ALL.length + ' 只场外基金';
+  ['fundTopToggle', 'fundBottomToggle'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<span class="chip big">' + label + '</span>';
+    el.querySelector('.chip').addEventListener('click', () => {
+      fundScope = fundScope === 'all' ? 'hot' : 'all';
+      renderFundToggle(); renderFunds(); window.scrollTo(0, 0);
+    });
   });
 }
 function renderFundChips() {
@@ -575,7 +581,6 @@ function renderFunds() {
       + (f.hist ? '<div class="hist">变更：' + f.hist + '</div>' : '')
       + '</div>').join('');
   }
-  document.getElementById('etfGrid').innerHTML = '';
 }
 
 /* ===== 渲染：场内 ETF（默认只展示前 6 只，可展开全部） ===== */
@@ -622,7 +627,7 @@ document.querySelectorAll('nav button').forEach(btn => {
 if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
   renderClock();
   renderCalendar();
-  renderScopeChips();
+  renderFundToggle();
   renderFundChips();
   renderFunds();
   renderEtf();
@@ -630,6 +635,9 @@ if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
   renderHot();
   document.getElementById('hotMore').addEventListener('click', e => {
     e.preventDefault();
+    fundScope = 'all';
+    renderFundToggle();
+    renderFunds();
     document.querySelector('nav button[data-p="fund"]').click();
   });
   document.getElementById('fundSearch').addEventListener('input', e => {
