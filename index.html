@@ -27,6 +27,10 @@
   header h1{font-size:20px;font-weight:700;letter-spacing:.5px}
   header h1 small{font-size:12px;color:var(--ink3);font-weight:400;margin-left:10px}
   header .dst{font-size:12px;color:var(--ink3)}
+  .hgroup{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .visit-pill{display:inline-flex;align-items:center;white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 12px;font-size:12px;color:var(--ink2)}
+  .visit-pill b{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;margin:0 1px}
+  .visit-pill[hidden]{display:none}
   main{flex:1;padding:0 20px 88px;width:100%}
   .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
   .sec-t{font-size:13px;color:var(--ink3);margin:14px 2px 6px;font-weight:500}
@@ -142,7 +146,10 @@
 <body>
 <div id="app">
   <header>
-    <h1>美市时钟<small>纳斯达克开闭市时间查询</small></h1>
+    <div class="hgroup">
+      <h1>美市时钟<small>纳斯达克开闭市时间查询</small></h1>
+      <span class="visit-pill" id="visitPill" hidden>本站已有 <b id="busuanzi_value_site_pv">–</b> 次访问 · <b id="busuanzi_value_site_uv">–</b> 位访客</span>
+    </div>
     <span class="dst" id="dstTop"></span>
   </header>
   <main>
@@ -631,6 +638,21 @@ document.querySelectorAll('nav button').forEach(btn => {
 });
 
 if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
+  /* ===== 访问计数（不蒜子）：值异步回填后再显示，15 秒拿不到就一直隐藏 ===== */
+  (function () {
+    var s = document.createElement('script');
+    s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+    document.head.appendChild(s);
+    var pill = document.getElementById('visitPill');
+    var n = 0;
+    var t = setInterval(function () {
+      var pv = document.getElementById('busuanzi_value_site_pv');
+      var uv = document.getElementById('busuanzi_value_site_uv');
+      if (pv && pv.textContent && pv.textContent !== '–' && uv && uv.textContent && uv.textContent !== '–') {
+        pill.hidden = false; clearInterval(t);
+      } else if (++n > 50) { clearInterval(t); }
+    }, 300);
+  })();
   renderClock();
   renderCalendar();
   renderFundToggle();
