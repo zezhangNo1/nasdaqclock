@@ -638,10 +638,10 @@ document.querySelectorAll('nav button').forEach(btn => {
 });
 
 if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
-  /* ===== 访问计数（不蒜子）：值异步回填后再显示，15 秒拿不到就一直隐藏 ===== */
+  /* ===== 访问计数（Vercount，不蒜子平替且 id 兼容）：值异步回填后再显示，15 秒拿不到就一直隐藏 ===== */
   (function () {
     var s = document.createElement('script');
-    s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+    s.src = 'https://www.vercount.one/js';
     document.head.appendChild(s);
     var pill = document.getElementById('visitPill');
     var n = 0;
