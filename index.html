@@ -65,24 +65,6 @@
     font-size:14px;font-family:inherit;background:#fff;color:var(--ink);outline:none;
   }
   .toolbar input:focus{border-color:var(--accent)}
-  .dstat{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
-  .dstat span{font-size:12px;color:var(--ink2);border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 12px}
-  .dstat span b{color:var(--ink)}
-  .dtable{display:flex;flex-direction:column;gap:8px}
-  .drow{display:grid;grid-template-columns:minmax(200px,1.5fr) 1fr 1fr auto;gap:12px;align-items:center;background:var(--card);border-radius:12px;padding:10px 14px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
-  .drow .dn b{display:block;font-size:13px;font-weight:600}
-  .drow .dn small{color:var(--ink3);font-size:11px}
-  .drow .dc{font-size:13px;font-variant-numeric:tabular-nums}
-  .drow .dc small{display:block;color:var(--ink3);font-size:10px;letter-spacing:2px;margin-bottom:1px}
-  .drow .dv{color:#c0392b;font-weight:700}
-  .drow .dd{font-size:11px;color:var(--ink3);white-space:nowrap}
-  .widen{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;color:#fff;background:#c0392b;border-radius:4px;padding:1px 5px;vertical-align:1px}
-  .drow.k-stop{opacity:.65}
-  @media(max-width:640px){
-    .drow{grid-template-columns:1fr 1fr;row-gap:6px;padding:12px}
-    .drow .dn{grid-column:1/-1}
-    .drow .dd{grid-column:1/-1}
-  }
   .funds-grid{display:grid;grid-template-columns:1fr;gap:12px}
   .fcard{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
   .fcard .t{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -214,14 +196,6 @@
       <div id="etfBottomToggle"></div>
       <div class="disc" style="padding-top:12px">状态数据整理自天天基金详情页公开信息（2026-10-03 实测），数据可能滞后，仅供参考，不构成投资建议；具体以基金公司和相应销售渠道当前有效公告为准。任何有限额均如实显示为限购，不按金额归为开放。「直销」行整理自各基金公司最新限额公告，未标注的为公告未明确直销口径或公告与代销平台状态冲突，直销渠道实际限额以基金公司 APP 内提示为准。</div>
     </section>
-    <!-- 页 2.5：直销额度 -->
-    <section class="page" id="page-direct">
-      <div class="sec-t">直销额度 · 基金公司公告口径</div>
-      <div class="asof">「直销」= 在基金公司 APP/官网直接买，限额常与代销（支付宝/天天基金等）不同，往往更宽松 —— 同一只基金代销限 10 元时，直销可能能买 100。下表按公告口径排列，<b>直销比代销宽的已标出</b> · 没列出的基金 = 公告未明确直销口径，以 APP 内实测为准 · 直销限额调整频繁，下单前以基金公司 APP 内提示为准</div>
-      <div class="dstat" id="directStats"></div>
-      <div class="dtable" id="directTable"></div>
-      <div class="disc" style="padding-top:12px">本页整理自各基金公司最新公开限额公告（天天基金公告库，2026-10-04 抽取），与 APP 内实时提示可能存在时间差；公告未分渠道的按公告原文标注。不构成投资建议。</div>
-    </section>
     <!-- 页 3：休市日历 -->
     <section class="page" id="page-cal">
       <div class="sec-t">节假日休市与提前收市（美东日期）</div>
@@ -234,7 +208,6 @@
   <nav>
     <button class="on" data-p="clock"><span class="ico">🕘</span>时钟</button>
     <button data-p="fund"><span class="ico">📊</span>基金额度</button>
-    <button data-p="direct"><span class="ico">🏦</span>直销额度</button>
     <button data-p="cal"><span class="ico">📅</span>休市日历</button>
   </nav>
 </div>
@@ -668,55 +641,6 @@ function renderHot() {
     + '<div class="lm">' + f.limit + '</div></div>').join('');
 }
 
-/* ===== 渲染：直销额度页 ===== */
-function directAmt(v) {
-  var m = /([\d.]+)\s*万/.exec(v); if (m) return parseFloat(m[1]) * 10000;
-  m = /([\d.]+)/.exec(v); return m ? parseFloat(m[1]) : NaN;
-}
-function renderDirect() {
-  var rows = FUNDS_ALL.filter(function (f) { return DIRECT[f.code]; })
-    .map(function (f) { return { f: f, D: DIRECT[f.code] }; });
-  var ORD = { direct: 0, same: 1, open: 2, stop: 3 };
-  rows.sort(function (a, b) {
-    var d = ORD[a.D.k] - ORD[b.D.k];
-    if (d) return d;
-    if (a.D.k === 'direct' && b.D.k === 'direct') {
-      var x = directAmt(a.D.v), y = directAmt(b.D.v);
-      if (!isNaN(x) && !isNaN(y) && x !== y) return x - y;
-    }
-    return a.f.code < b.f.code ? -1 : 1;
-  });
-  var nDirect = rows.filter(function (r) { return r.D.k === 'direct'; }).length;
-  var nSame = rows.filter(function (r) { return r.D.k === 'same'; }).length;
-  var nStop = rows.filter(function (r) { return r.D.k === 'stop'; }).length;
-  var nWide = rows.filter(function (r) {
-    if (r.D.k !== 'direct') return false;
-    var a = directAmt(r.D.v), b = directAmt(r.f.limit);
-    return !isNaN(a) && !isNaN(b) && a > b;
-  }).length;
-  document.getElementById('directStats').innerHTML =
-    '<span>公告明确直销限额 <b>' + nDirect + '</b> 只</span>' +
-    '<span>直销比代销宽 <b>' + nWide + '</b> 只</span>' +
-    '<span>公告未分渠道 <b>' + nSame + '</b> 只</span>' +
-    '<span>全渠道暂停 <b>' + nStop + '</b> 只</span>';
-  document.getElementById('directTable').innerHTML = rows.map(function (r) {
-    var f = r.f, D = r.D, dcell, widen = '';
-    if (D.k === 'direct') {
-      dcell = '<b class="dv">' + D.v + '</b>';
-      var a = directAmt(D.v), b = directAmt(f.limit);
-      if (!isNaN(a) && !isNaN(b) && a > b) widen = '<span class="widen">直销更宽</span>';
-    } else if (D.k === 'same') dcell = '公告未分渠道 ' + D.v;
-    else if (D.k === 'open') dcell = '公告全渠道开放';
-    else dcell = '全渠道暂停申购';
-    return '<div class="drow k-' + D.k + '">'
-      + '<div class="dn"><b>' + f.name + '</b><small>' + f.code + ' · ' + f.cls + '</small></div>'
-      + '<div class="dc"><small>代销</small>' + f.limit.replace('（代销口径）', '') + '</div>'
-      + '<div class="dc"><small>直销</small>' + dcell + widen + '</div>'
-      + '<div class="dd">' + D.dt.slice(5) + ' 公告</div>'
-      + '</div>';
-  }).join('');
-}
-
 /* 页签 */
 document.querySelectorAll('nav button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -752,7 +676,6 @@ if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
   renderEtf();
   renderEtfToggle();
   renderHot();
-  renderDirect();
   document.getElementById('hotMore').addEventListener('click', e => {
     e.preventDefault();
     fundScope = 'all';
