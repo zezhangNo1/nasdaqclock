@@ -98,6 +98,16 @@
   .empty{color:var(--ink3);font-size:13px;padding:16px;text-align:center}
   /* 首页热门基金速览 */
   .hot-wrap{padding:0;overflow:hidden}
+  .idxStrip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+  .ixcard{background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:0 1px 2px rgba(28,36,48,.04);cursor:pointer;border:1px solid transparent;transition:border-color .15s}
+  .ixcard:hover{border-color:var(--accent)}
+  .ixcard .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .ixcard .nm{font-size:13px;font-weight:700}
+  .ixcard .px{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+  .ixcard .pc{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+  .ixcard svg{width:100%;height:34px;display:block;margin-top:6px}
+  .ixcard .hint{font-size:10px;color:var(--ink3);margin-top:4px}
+  @media(max-width:640px){.idxStrip{grid-template-columns:1fr;gap:8px}.ixcard svg{height:28px}}
   .hot-grid{display:grid;grid-template-columns:1fr}
   .hot-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line)}
   .hot-row:last-child{border-bottom:none}
@@ -192,6 +202,8 @@
           <div class="card" id="nextCard"></div>
         </div>
       </div>
+      <div class="sec-t" style="margin-top:18px">美股三大指数 · 点看大图</div>
+      <div class="idxStrip" id="idxStrip"></div>
       <div class="sec-t">热门纳指基金 · 申购限额速览</div>
       <div class="card hot-wrap">
         <div class="hot-grid" id="hotGrid"></div>
@@ -818,10 +830,14 @@ function loadIdx(force) {
   var item = IDX_LIST[idxSel];
   var per = IDX_PERIODS.filter(function (x) { return x.k === idxPk; })[0];
   var jobs = [];
-  if (force || !idxQ[item.secid]) {
-    jobs.push(idxFetch('https://push2.eastmoney.com/api/qt/stock/get?secid=' + item.secid + '&invt=2&fltt=2&fields=f43,f44,f45,f46,f47,f58,f60,f86,f169,f170,f171')
-      .then(function (d) { if (d && d.data) idxQ[item.secid] = d.data; }));
-  }
+  /* 三个指数的报价都要（首页迷你卡用） */
+  IDX_LIST.forEach(function (x) {
+    if (force || !idxQ[x.secid]) {
+      jobs.push(idxFetch('https://push2.eastmoney.com/api/qt/stock/get?secid=' + x.secid + '&invt=2&fltt=2&fields=f43,f44,f45,f46,f47,f58,f60,f86,f169,f170,f171')
+        .then(function (d) { if (d && d.data) idxQ[x.secid] = d.data; }));
+    }
+  });
+  /* 当前周期 K 线（大图用） */
   var key = item.secid + '|' + idxPk;
   if (force || !idxK[key]) {
     jobs.push(idxFetch('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + item.secid + '&fields1=f1,f2&fields2=f51,f52,f53,f54,f55,f56,f57&klt=' + per.klt + '&fqt=1&end=20500101&lmt=' + per.lmt)
@@ -830,13 +846,68 @@ function loadIdx(force) {
         idxK[key] = kl.map(function (r) { var a = r.split(','); return [a[0], parseFloat(a[2])]; });
       }));
   }
-  if (!jobs.length) { renderIdxHead(); drawIdx(); return; }
+  /* 分时 1 分钟线（首页迷你走势图用，各指数缓存一份） */
+  IDX_LIST.forEach(function (x) {
+    var sk = x.secid + '|1';
+    if (!idxK[sk]) {
+      jobs.push(idxFetch('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + x.secid + '&fields1=f1,f2&fields2=f51,f52,f53,f54,f55,f56,f57&klt=1&fqt=1&end=20500101&lmt=390')
+        .then(function (d) {
+          var kl = (d && d.data && d.data.klines) || [];
+          idxK[sk] = kl.map(function (r) { var a = r.split(','); return [a[0], parseFloat(a[2])]; });
+        }));
+    }
+  });
+  if (!jobs.length) { renderIdxHead(); drawIdx(); renderStrip(); return; }
   idxMsg('加载中…');
   Promise.all(jobs).then(function () {
     idxMsg('');
-    renderIdxHead(); drawIdx();
+    renderIdxHead(); drawIdx(); renderStrip();
   }).catch(function () {
-    idxMsg('行情接口暂时不可用，请稍后刷新重试', true);
+    idxMsg('行情接口暂时不可用，约 1 分钟后自动重试', true);
+  });
+}
+/* 首页迷你指数卡 */
+function renderStrip() {
+  var el = document.getElementById('idxStrip');
+  if (!el) return;
+  el.innerHTML = IDX_LIST.map(function (x, i) {
+    var q = idxQ[x.secid];
+    var cls = '', pc = '…', px = '--';
+    if (q && q.f43 !== undefined) {
+      cls = idxColor(q.f169);
+      px = idxFmt(q.f43);
+      pc = idxSign(q.f169) + idxFmt(q.f170) + '%';
+    }
+    var spark = '';
+    var arr = idxK[x.secid + '|1'];
+    if (arr && arr.length > 1) {
+      var vs = arr.map(function (r) { return r[1]; });
+      var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+      var sp = (mx - mn) || 1;
+      var pts = vs.map(function (v, j) {
+        return (j / (vs.length - 1) * 100).toFixed(2) + ',' + (28 - (v - mn) / sp * 26).toFixed(2);
+      }).join(' ');
+      var col = (q && q.f169 !== undefined) ? (q.f169 > 0 ? '#e0342f' : (q.f169 < 0 ? '#1aa564' : '#98a2ad')) : '#98a2ad';
+      spark = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>';
+    } else {
+      spark = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"></svg>';
+    }
+    var hint = (q && q.f86) ? '数据时间 ' + (function (t) { return (t.getMonth() + 1) + '-' + t.getDate() + ' ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2); })(new Date(q.f86 * 1000)) : '加载中…';
+    return '<div class="ixcard" data-i="' + i + '">'
+      + '<div class="top"><span class="nm">' + x.name + '</span><span class="pc ' + cls + '">' + pc + '</span></div>'
+      + '<div class="px ' + cls + '">' + px + '</div>'
+      + spark
+      + '<div class="hint">' + hint + ' · 点看大图</div>'
+      + '</div>';
+  }).join('');
+  Array.prototype.forEach.call(el.querySelectorAll('.ixcard'), function (c) {
+    c.onclick = function () {
+      idxSel = +c.dataset.i;
+      renderIdxChips();
+      var btn = document.querySelector('nav button[data-p="idx"]');
+      if (btn) btn.click();
+      loadIdx(false);
+    };
   });
 }
 
@@ -877,6 +948,7 @@ if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
   renderHot();
   renderIdxChips();
   renderIdxPeriods();
+  renderStrip();
   loadIdx(false);
   setInterval(function () {
     if (document.getElementById('page-idx').classList.contains('on') && document.visibilityState === 'visible') loadIdx(true);
