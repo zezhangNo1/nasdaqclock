@@ -913,19 +913,34 @@ function loadIdxTx(force) {
   if (needQ.length) {
     jobs.push(txScript('https://qt.gtimg.cn/q=' + needQ.map(function (x) { return x.tcode; }).join(',')).then(txParseQuote));
   }
-  if (force || !idxK[item.secid + '|101']) jobs.push(txDay(item, 120));
-  if (idxPk === '1' || idxPk === '5') {
+  /* 当前周期：日K 走腾讯；分时/五日腾讯无美股分钟线，明确提示后落回日K */
+  var key = item.secid + '|' + idxPk;
+  if (idxPk !== '101') {
     idxPk = '101';
     renderIdxPeriods();
+    idxMsg('备用线路暂无分时/五日（东财接口限制当前网络），已显示日K', true);
+    var self = this;
+    setTimeout(function () { if (idxSrc === 'tx') idxMsg(''); }, 3500);
+    key = item.secid + '|101';
   }
-  document.getElementById('idxAsof').innerHTML = '当前为<b>腾讯备用数据源</b>（东方财富接口对当前网络不可达）：报价与日K正常，分时/五日暂缺';
+  if (force || !idxK[key]) jobs.push(txDay(item, 120));
+  /* 首页迷你走势图：备用线路用日K近30根（腾讯直连） */
+  IDX_LIST.forEach(function (x) {
+    if (!idxK[x.secid + '|spark']) {
+      jobs.push(txScript('https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?_var=txS' + x.tcode + '&param=' + x.tcode + ',day,,,30,qfq').then(function () {
+        var d = window['txS' + x.tcode];
+        var arr = (d && d.data && d.data[x.tcode] && d.data[x.tcode].day) || [];
+        idxK[x.secid + '|spark'] = arr.map(function (r) { return [r[0], parseFloat(r[2])]; });
+      }));
+    }
+  });
+  document.getElementById('idxAsof').innerHTML = '当前为<b>备用线路</b>（东财接口限制当前网络）：报价、日K、迷你走势来自腾讯直连；分时/五日需东财直连，暂不可用';
   if (!jobs.length) { renderIdxHead(); drawIdx(); renderStrip(); return; }
-  idxMsg('加载中…');
+  if (!document.getElementById('idxMsg').hidden) { /* 保留提示 */ }
   Promise.all(jobs).then(function () {
-    idxMsg('');
     renderIdxHead(); drawIdx(); renderStrip();
   }).catch(function () {
-    idxMsg('东财与腾讯行情源都暂时不可用，约 1 分钟后自动重试', true);
+    idxMsg('备用线路暂时不可用，约 1 分钟后自动重试', true);
   });
 }
 /* 首页迷你指数卡 */
@@ -941,7 +956,7 @@ function renderStrip() {
       pc = idxSign(q.f169) + idxFmt(q.f170) + '%';
     }
     var spark = '';
-    var arr = idxK[x.secid + '|1'];
+    var arr = idxK[x.secid + '|1'] || idxK[x.secid + '|spark'];
     if (arr && arr.length > 1) {
       var vs = arr.map(function (r) { return r[1]; });
       var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
@@ -954,7 +969,7 @@ function renderStrip() {
     } else {
       spark = '<svg viewBox="0 0 100 30" preserveAspectRatio="none"></svg>';
     }
-    var hint = (q && q.f86) ? '数据时间 ' + (function (t) { return (t.getMonth() + 1) + '-' + t.getDate() + ' ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2); })(new Date(q.f86 * 1000)) : '加载中…';
+    var hint = (q && q.f86) ? ('数据时间 ' + (function (t) { return (t.getMonth() + 1) + '-' + t.getDate() + ' ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2); })(new Date(q.f86 * 1000)) + ' · ' + (idxK[x.secid + '|1'] ? '分时' : '近30日') + '走势') : '加载中…';
     return '<div class="ixcard" data-i="' + i + '">'
       + '<div class="top"><span class="nm">' + x.name + '</span><span class="pc ' + cls + '">' + pc + '</span></div>'
       + '<div class="px ' + cls + '">' + px + '</div>'
