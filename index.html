@@ -697,7 +697,9 @@ var IDX_LIST = [
 var IDX_PERIODS = [
   { k: '1', label: '分时', klt: 1, lmt: 390 },
   { k: '5', label: '五日', klt: 5, lmt: 390 },
-  { k: '101', label: '日K', klt: 101, lmt: 120 }
+  { k: '101', label: '日K', klt: 101, lmt: 120 },
+  { k: '102', label: '周K', klt: 102, lmt: 100 },
+  { k: '103', label: '月K', klt: 103, lmt: 60 }
 ];
 var idxSel = 0, idxPk = '1', idxQ = {}, idxK = {};
 var idxSrc = 'em', idxTried = false;
@@ -898,12 +900,13 @@ function txParseQuote() {
     q.f86 = Date.UTC(+t[0], +t[1] - 1, +t[2], +t[3] - 8, +t[4], +t[5]) / 1000;
   });
 }
-function txDay(x, lmt) {
-  return txScript('https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?_var=txK' + x.tcode + '&param=' + x.tcode + ',day,,,' + lmt + ',qfq')
+function txKline(x, per, lmt, varPrefix) {
+  return txScript('https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?_var=' + varPrefix + x.tcode + '&param=' + x.tcode + ',' + per + ',,,' + lmt + ',qfq')
     .then(function () {
-      var d = window['txK' + x.tcode];
-      var arr = (d && d.data && d.data[x.tcode] && d.data[x.tcode].day) || [];
-      idxK[x.secid + '|101'] = arr.map(function (r) { return [r[0], parseFloat(r[2])]; });
+      var d = window[varPrefix + x.tcode];
+      var o = (d && d.data && d.data[x.tcode]) || {};
+      var arr = o[per] || o.day || [];
+      return arr.map(function (r) { return [r[0], parseFloat(r[2])]; });
     });
 }
 function loadIdxTx(force) {
@@ -913,28 +916,26 @@ function loadIdxTx(force) {
   if (needQ.length) {
     jobs.push(txScript('https://qt.gtimg.cn/q=' + needQ.map(function (x) { return x.tcode; }).join(',')).then(txParseQuote));
   }
-  /* 当前周期：日K 走腾讯；分时/五日腾讯无美股分钟线，明确提示后落回日K */
-  var key = item.secid + '|' + idxPk;
-  if (idxPk !== '101') {
+  /* 当前周期映射：日/周/月腾讯直连可用；分时/五日腾讯无美股分钟线，明确提示后落回日K */
+  var txPer = { '101': 'day', '102': 'week', '103': 'month' }[idxPk];
+  if (!txPer) {
+    txPer = 'day';
     idxPk = '101';
     renderIdxPeriods();
     idxMsg('备用线路暂无分时/五日（东财接口限制当前网络），已显示日K', true);
-    var self = this;
     setTimeout(function () { if (idxSrc === 'tx') idxMsg(''); }, 3500);
-    key = item.secid + '|101';
   }
-  if (force || !idxK[key]) jobs.push(txDay(item, 120));
+  var key = item.secid + '|' + idxPk;
+  if (force || !idxK[key]) {
+    jobs.push(txKline(item, txPer, txPer === 'day' ? 120 : (txPer === 'week' ? 100 : 60), 'txK').then(function (arr) { idxK[key] = arr; }));
+  }
   /* 首页迷你走势图：备用线路用日K近30根（腾讯直连） */
   IDX_LIST.forEach(function (x) {
     if (!idxK[x.secid + '|spark']) {
-      jobs.push(txScript('https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?_var=txS' + x.tcode + '&param=' + x.tcode + ',day,,,30,qfq').then(function () {
-        var d = window['txS' + x.tcode];
-        var arr = (d && d.data && d.data[x.tcode] && d.data[x.tcode].day) || [];
-        idxK[x.secid + '|spark'] = arr.map(function (r) { return [r[0], parseFloat(r[2])]; });
-      }));
+      jobs.push(txKline(x, 'day', 30, 'txS').then(function (arr) { idxK[x.secid + '|spark'] = arr; }));
     }
   });
-  document.getElementById('idxAsof').innerHTML = '当前为<b>备用线路</b>（东财接口限制当前网络）：报价、日K、迷你走势来自腾讯直连；分时/五日需东财直连，暂不可用';
+  document.getElementById('idxAsof').innerHTML = '当前为<b>备用线路</b>（东财接口限制当前网络）：报价、日/周/月K、迷你走势来自腾讯直连；分时/五日需东财直连，暂不可用';
   if (!jobs.length) { renderIdxHead(); drawIdx(); renderStrip(); return; }
   if (!document.getElementById('idxMsg').hidden) { /* 保留提示 */ }
   Promise.all(jobs).then(function () {
