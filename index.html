@@ -240,7 +240,7 @@
         </div>
       </div>
       <div class="asof" id="idxAsof"></div>
-      <div class="disc" style="padding-top:12px">行情数据来自东方财富公开行情接口，盘中约 1 分钟延迟，不含盘前盘后，仅供参考，不构成投资建议。红涨绿跌。</div>
+      <div class="disc" style="padding-top:12px">行情数据来自东方财富公开行情接口（主源，盘中约 1 分钟延迟），不可用时自动切换腾讯备用源（报价与日K）；均不含盘前盘后，仅供参考，不构成投资建议。红涨绿跌。</div>
     </section>
     <!-- 页 3：休市日历 -->
     <section class="page" id="page-cal">
@@ -690,9 +690,9 @@ function renderHot() {
 
 /* ===== 渲染：美股指数（数据源：东方财富公开行情接口） ===== */
 var IDX_LIST = [
-  { secid: '100.NDX', name: '纳斯达克' },
-  { secid: '100.SPX', name: '标普500' },
-  { secid: '100.DJIA', name: '道琼斯' }
+  { secid: '100.NDX', name: '纳斯达克', tcode: 'usIXIC' },
+  { secid: '100.SPX', name: '标普500', tcode: 'usINX' },
+  { secid: '100.DJIA', name: '道琼斯', tcode: 'usDJI' }
 ];
 var IDX_PERIODS = [
   { k: '1', label: '分时', klt: 1, lmt: 390 },
@@ -700,6 +700,7 @@ var IDX_PERIODS = [
   { k: '101', label: '日K', klt: 101, lmt: 120 }
 ];
 var idxSel = 0, idxPk = '1', idxQ = {}, idxK = {};
+var idxSrc = 'em', idxTried = false;
 
 function idxJsonp(url) {
   return new Promise(function (resolve, reject) {
@@ -827,6 +828,7 @@ function drawIdx() {
   [padL, padL + cw / 2 - 14, padL + cw - 28].forEach(function (x, i) { ctx.fillText(lbl[i], x, H - 6); });
 }
 function loadIdx(force) {
+  if (idxSrc === 'tx') { loadIdxTx(force); return; }
   var item = IDX_LIST[idxSel];
   var per = IDX_PERIODS.filter(function (x) { return x.k === idxPk; })[0];
   var jobs = [];
@@ -863,7 +865,67 @@ function loadIdx(force) {
     idxMsg('');
     renderIdxHead(); drawIdx(); renderStrip();
   }).catch(function () {
-    idxMsg('行情接口暂时不可用，约 1 分钟后自动重试', true);
+    if (!idxTried) { idxTried = true; idxSrc = 'tx'; loadIdx(force); }
+    else idxMsg('行情接口暂时不可用，约 1 分钟后自动重试', true);
+  });
+}
+
+/* ---- 腾讯备用数据源（qt.gtimg.cn / web.ifzq.gtimg.cn，script 标签直连无 CORS 限制） ---- */
+function txScript(url) {
+  return new Promise(function (resolve, reject) {
+    var sc = document.createElement('script');
+    sc.src = url + '&r=' + Date.now();
+    sc.charset = 'GBK';
+    sc.onload = function () { resolve(); sc.remove(); };
+    sc.onerror = function () { reject(new Error('tx fail')); sc.remove(); };
+    document.head.appendChild(sc);
+  });
+}
+function txParseQuote() {
+  IDX_LIST.forEach(function (x) {
+    var raw = window['v_' + x.tcode];
+    if (!raw) return;
+    var f = raw.split('~');
+    if (f.length < 35) return;
+    var px = parseFloat(f[3]), pc = parseFloat(f[4]);
+    var hi = parseFloat(f[33]), lo = parseFloat(f[34]);
+    var q = idxQ[x.secid] = idxQ[x.secid] || {};
+    q.f43 = px; q.f58 = x.name; q.f60 = pc; q.f46 = parseFloat(f[5]);
+    q.f44 = hi; q.f45 = lo; q.f47 = parseFloat(f[6]) || 0;
+    q.f169 = parseFloat(f[31]); q.f170 = parseFloat(f[32]);
+    q.f171 = pc ? Math.round((hi - lo) / pc * 10000) / 100 : 0;
+    var t = f[30].split(/[- :]/);
+    q.f86 = Date.UTC(+t[0], +t[1] - 1, +t[2], +t[3] - 8, +t[4], +t[5]) / 1000;
+  });
+}
+function txDay(x, lmt) {
+  return txScript('https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?_var=txK' + x.tcode + '&param=' + x.tcode + ',day,,,' + lmt + ',qfq')
+    .then(function () {
+      var d = window['txK' + x.tcode];
+      var arr = (d && d.data && d.data[x.tcode] && d.data[x.tcode].day) || [];
+      idxK[x.secid + '|101'] = arr.map(function (r) { return [r[0], parseFloat(r[2])]; });
+    });
+}
+function loadIdxTx(force) {
+  var item = IDX_LIST[idxSel];
+  var needQ = IDX_LIST.filter(function (x) { return force || !idxQ[x.secid]; });
+  var jobs = [];
+  if (needQ.length) {
+    jobs.push(txScript('https://qt.gtimg.cn/q=' + needQ.map(function (x) { return x.tcode; }).join(',')).then(txParseQuote));
+  }
+  if (force || !idxK[item.secid + '|101']) jobs.push(txDay(item, 120));
+  if (idxPk === '1' || idxPk === '5') {
+    idxPk = '101';
+    renderIdxPeriods();
+  }
+  document.getElementById('idxAsof').innerHTML = '当前为<b>腾讯备用数据源</b>（东方财富接口对当前网络不可达）：报价与日K正常，分时/五日暂缺';
+  if (!jobs.length) { renderIdxHead(); drawIdx(); renderStrip(); return; }
+  idxMsg('加载中…');
+  Promise.all(jobs).then(function () {
+    idxMsg('');
+    renderIdxHead(); drawIdx(); renderStrip();
+  }).catch(function () {
+    idxMsg('东财与腾讯行情源都暂时不可用，约 1 分钟后自动重试', true);
   });
 }
 /* 首页迷你指数卡 */
