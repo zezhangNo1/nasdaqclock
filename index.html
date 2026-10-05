@@ -65,6 +65,25 @@
     font-size:14px;font-family:inherit;background:#fff;color:var(--ink);outline:none;
   }
   .toolbar input:focus{border-color:var(--accent)}
+  .ichips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
+  .ichips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 16px;font-size:13px;color:var(--ink2);cursor:pointer}
+  .ichips button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .icard{background:var(--card);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
+  .ihead .irow1{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .ihead .iname{font-size:15px;font-weight:700}
+  .ihead .ipx{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  .ihead .ichg{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+  .up{color:#e0342f}.down{color:#1aa564}.flat{color:var(--ink2)}
+  .ihead .imeta{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .ihead .imeta small{color:var(--ink3);margin-right:4px}
+  .iperiods{display:flex;gap:6px;margin:14px 0 8px}
+  .iperiods button{border:none;background:none;font-size:13px;color:var(--ink2);cursor:pointer;padding:2px 2px}
+  .iperiods button.on{color:var(--accent);font-weight:700;border-bottom:2px solid var(--accent)}
+  .ichart-wrap{position:relative;height:260px}
+  .ichart-wrap canvas{width:100%;height:100%;display:block}
+  .imsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--ink3);pointer-events:none}
+  .imsg[hidden]{display:none}
+  @media(max-width:640px){.ichart-wrap{height:200px}.ihead .ipx{font-size:26px}}
   .funds-grid{display:grid;grid-template-columns:1fr;gap:12px}
   .fcard{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(28,36,48,.04)}
   .fcard .t{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -196,6 +215,21 @@
       <div id="etfBottomToggle"></div>
       <div class="disc" style="padding-top:12px">状态数据整理自天天基金详情页公开信息（2026-10-03 实测），数据可能滞后，仅供参考，不构成投资建议；具体以基金公司和相应销售渠道当前有效公告为准。任何有限额均如实显示为限购，不按金额归为开放。「直销」行整理自各基金公司最新限额公告，未标注的为公告未明确直销口径或公告与代销平台状态冲突，直销渠道实际限额以基金公司 APP 内提示为准。</div>
     </section>
+    <!-- 页 2.7：美股指数 -->
+    <section class="page" id="page-idx">
+      <div class="sec-t">美股三大指数 · 实时行情</div>
+      <div class="ichips" id="idxChips"></div>
+      <div class="icard">
+        <div class="ihead" id="idxHead"></div>
+        <div class="iperiods" id="idxPeriods"></div>
+        <div class="ichart-wrap">
+          <canvas id="idxCanvas"></canvas>
+          <div class="imsg" id="idxMsg">加载中…</div>
+        </div>
+      </div>
+      <div class="asof" id="idxAsof"></div>
+      <div class="disc" style="padding-top:12px">行情数据来自东方财富公开行情接口，盘中约 1 分钟延迟，不含盘前盘后，仅供参考，不构成投资建议。红涨绿跌。</div>
+    </section>
     <!-- 页 3：休市日历 -->
     <section class="page" id="page-cal">
       <div class="sec-t">节假日休市与提前收市（美东日期）</div>
@@ -208,6 +242,7 @@
   <nav>
     <button class="on" data-p="clock"><span class="ico">🕘</span>时钟</button>
     <button data-p="fund"><span class="ico">📊</span>基金额度</button>
+    <button data-p="idx"><span class="ico">📈</span>美股指数</button>
     <button data-p="cal"><span class="ico">📅</span>休市日历</button>
   </nav>
 </div>
@@ -641,6 +676,170 @@ function renderHot() {
     + '<div class="lm">' + f.limit + '</div></div>').join('');
 }
 
+/* ===== 渲染：美股指数（数据源：东方财富公开行情接口） ===== */
+var IDX_LIST = [
+  { secid: '100.NDX', name: '纳斯达克' },
+  { secid: '100.SPX', name: '标普500' },
+  { secid: '100.DJIA', name: '道琼斯' }
+];
+var IDX_PERIODS = [
+  { k: '1', label: '分时', klt: 1, lmt: 390 },
+  { k: '5', label: '五日', klt: 5, lmt: 390 },
+  { k: '101', label: '日K', klt: 101, lmt: 120 }
+];
+var idxSel = 0, idxPk = '1', idxQ = {}, idxK = {};
+
+function idxJsonp(url) {
+  return new Promise(function (resolve, reject) {
+    var cb = 'idxCb' + Date.now();
+    window[cb] = function (d) { resolve(d); cleanup(); };
+    var sc = document.createElement('script');
+    sc.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'cb=' + cb;
+    sc.onerror = function () { reject(new Error('jsonp fail')); cleanup(); };
+    function cleanup() { try { delete window[cb]; } catch (e) { window[cb] = undefined; } sc.remove(); }
+    document.head.appendChild(sc);
+  });
+}
+function idxFetch(url) {
+  return fetch(url).then(function (r) { return r.json(); })
+    .catch(function () { return idxJsonp(url); });
+}
+function idxFmt(n, d) {
+  if (n === null || n === undefined || n === '-') return '--';
+  return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function idxSign(v) { return v > 0 ? '+' : ''; }
+function idxColor(v) { return v > 0 ? 'up' : (v < 0 ? 'down' : 'flat'); }
+
+function renderIdxChips() {
+  document.getElementById('idxChips').innerHTML = IDX_LIST.map(function (x, i) {
+    return '<button class="' + (i === idxSel ? 'on' : '') + '" data-i="' + i + '">' + x.name + '</button>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('#idxChips button'), function (b) {
+    b.onclick = function () { idxSel = +b.dataset.i; renderIdxChips(); loadIdx(false); };
+  });
+}
+function renderIdxPeriods() {
+  document.getElementById('idxPeriods').innerHTML = IDX_PERIODS.map(function (x) {
+    return '<button class="' + (x.k === idxPk ? 'on' : '') + '" data-k="' + x.k + '">' + x.label + '</button>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('#idxPeriods button'), function (b) {
+    b.onclick = function () { idxPk = b.dataset.k; renderIdxPeriods(); loadIdx(false); };
+  });
+}
+function idxMsg(t, err) {
+  var el = document.getElementById('idxMsg');
+  if (!t) { el.hidden = true; return; }
+  el.hidden = false;
+  el.textContent = t;
+  el.style.color = err ? '#c0392b' : '';
+}
+function renderIdxHead() {
+  var q = idxQ[IDX_LIST[idxSel].secid];
+  if (!q || q.f43 === undefined) return;
+  var cls = idxColor(q.f169);
+  var vol = (typeof q.f47 === 'number' && q.f47 > 0) ? (q.f47 / 1e8).toFixed(2) + ' 亿股' : '--';
+  var t = q.f86 ? new Date(q.f86 * 1000) : null;
+  var tStr = t ? (t.getMonth() + 1) + '-' + t.getDate() + ' ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2) : '--';
+  document.getElementById('idxHead').innerHTML =
+    '<div class="irow1"><span class="iname">' + q.f58 + '</span>'
+    + '<span class="ipx ' + cls + '">' + idxFmt(q.f43) + '</span>'
+    + '<span class="ichg ' + cls + '">' + idxSign(q.f169) + idxFmt(q.f169) + ' · ' + idxSign(q.f170) + idxFmt(q.f170) + '%</span></div>'
+    + '<div class="imeta">'
+    + '<span><small>今开</small>' + idxFmt(q.f46) + '</span>'
+    + '<span><small>最高</small>' + idxFmt(q.f44) + '</span>'
+    + '<span><small>最低</small>' + idxFmt(q.f45) + '</span>'
+    + '<span><small>昨收</small>' + idxFmt(q.f60) + '</span>'
+    + '<span><small>成交量</small>' + vol + '</span>'
+    + '<span><small>振幅</small>' + idxFmt(q.f171) + '%</span>'
+    + '<span><small>数据时间</small>' + tStr + '</span>'
+    + '</div>';
+}
+function drawIdx() {
+  var key = IDX_LIST[idxSel].secid + '|' + idxPk;
+  var arr = idxK[key];
+  var cv = document.getElementById('idxCanvas');
+  if (!arr || !arr.length) return;
+  var q = idxQ[IDX_LIST[idxSel].secid];
+  var pts = arr.map(function (r) { return { t: r[0], v: r[1] }; });
+  var isMin = idxPk === '1';
+  var baseline = isMin && q && q.f60 ? q.f60 : null;
+  var dpr = window.devicePixelRatio || 1;
+  var W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  var ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+  var padL = 6, padR = 62, padT = 8, padB = 22;
+  var cw = W - padL - padR, ch = H - padT - padB;
+  var vals = pts.map(function (p) { return p.v; });
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if (baseline !== null) { mn = Math.min(mn, baseline); mx = Math.max(mx, baseline); }
+  var span = (mx - mn) || 1;
+  mn -= span * 0.06; mx += span * 0.06;
+  span = mx - mn;
+  function Y(v) { return padT + (mx - v) / span * ch; }
+  function X(i) { return padL + (isMin ? i / 389 : i / (pts.length - 1)) * cw; }
+  ctx.font = '10px -apple-system,system-ui,sans-serif';
+  ctx.fillStyle = '#98a2ad';
+  var yMarks = [mx - span * 0.09, baseline !== null ? baseline : (mn + mx) / 2, mn + span * 0.09];
+  var lastLblY = -99;
+  yMarks.forEach(function (v) {
+    var y = Y(v);
+    ctx.strokeStyle = 'rgba(28,36,48,.06)';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + cw, y); ctx.stroke();
+    if (y - lastLblY < 12) return;
+    lastLblY = y;
+    ctx.fillText(idxFmt(v, idxPk === '101' ? 0 : 2), padL + cw + 6, y + 3);
+  });
+  if (baseline !== null) {
+    var yb = Y(baseline);
+    ctx.strokeStyle = '#b8bfc7';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(padL, yb); ctx.lineTo(padL + cw, yb); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  var refv = baseline !== null ? baseline : pts[0].v;
+  var colr = pts[pts.length - 1].v >= refv ? '#e0342f' : '#1aa564';
+  var grad = ctx.createLinearGradient(0, padT, 0, padT + ch);
+  grad.addColorStop(0, colr === '#e0342f' ? 'rgba(224,52,47,.16)' : 'rgba(26,165,100,.16)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath();
+  pts.forEach(function (p, i) { var x = X(i), y = Y(p.v); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.strokeStyle = colr; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.lineTo(X(pts.length - 1), padT + ch); ctx.lineTo(X(0), padT + ch); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.fillStyle = '#98a2ad';
+  var lbl = isMin ? [pts[0].t.slice(11, 16), pts[Math.floor(pts.length / 2)].t.slice(11, 16), pts[pts.length - 1].t.slice(11, 16)]
+                   : [pts[0].t.slice(5, 10), pts[Math.floor(pts.length / 2)].t.slice(5, 10), pts[pts.length - 1].t.slice(5, 10)];
+  [padL, padL + cw / 2 - 14, padL + cw - 28].forEach(function (x, i) { ctx.fillText(lbl[i], x, H - 6); });
+}
+function loadIdx(force) {
+  var item = IDX_LIST[idxSel];
+  var per = IDX_PERIODS.filter(function (x) { return x.k === idxPk; })[0];
+  var jobs = [];
+  if (force || !idxQ[item.secid]) {
+    jobs.push(idxFetch('https://push2.eastmoney.com/api/qt/stock/get?secid=' + item.secid + '&invt=2&fltt=2&fields=f43,f44,f45,f46,f47,f58,f60,f86,f169,f170,f171')
+      .then(function (d) { if (d && d.data) idxQ[item.secid] = d.data; }));
+  }
+  var key = item.secid + '|' + idxPk;
+  if (force || !idxK[key]) {
+    jobs.push(idxFetch('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + item.secid + '&fields1=f1,f2&fields2=f51,f52,f53,f54,f55,f56,f57&klt=' + per.klt + '&fqt=1&end=20500101&lmt=' + per.lmt)
+      .then(function (d) {
+        var kl = (d && d.data && d.data.klines) || [];
+        idxK[key] = kl.map(function (r) { var a = r.split(','); return [a[0], parseFloat(a[2])]; });
+      }));
+  }
+  if (!jobs.length) { renderIdxHead(); drawIdx(); return; }
+  idxMsg('加载中…');
+  Promise.all(jobs).then(function () {
+    idxMsg('');
+    renderIdxHead(); drawIdx();
+  }).catch(function () {
+    idxMsg('行情接口暂时不可用，请稍后刷新重试', true);
+  });
+}
+
 /* 页签 */
 document.querySelectorAll('nav button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -676,6 +875,14 @@ if (typeof document !== 'undefined' && document.getElementById('page-clock')) {
   renderEtf();
   renderEtfToggle();
   renderHot();
+  renderIdxChips();
+  renderIdxPeriods();
+  loadIdx(false);
+  setInterval(function () {
+    if (document.getElementById('page-idx').classList.contains('on') && document.visibilityState === 'visible') loadIdx(true);
+  }, 60000);
+  var idxRz;
+  window.addEventListener('resize', function () { clearTimeout(idxRz); idxRz = setTimeout(drawIdx, 200); });
   document.getElementById('hotMore').addEventListener('click', e => {
     e.preventDefault();
     fundScope = 'all';
